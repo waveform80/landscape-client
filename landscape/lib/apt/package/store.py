@@ -176,13 +176,15 @@ class PackageStore(HashIdStore):
 
     @with_cursor
     def add_available(self, cursor, ids):
-        for id in ids:
-            cursor.execute("REPLACE INTO available VALUES (?)", (id,))
+        ids = tuple(ids)
+        params = ', '.join(['(?)'] * len(ids))
+        cursor.execute("REPLACE INTO available VALUES %s" % params, ids)
 
     @with_cursor
     def remove_available(self, cursor, ids):
-        id_list = ",".join(str(int(id)) for id in ids)
-        cursor.execute("DELETE FROM available WHERE id IN (%s)" % id_list)
+        ids = tuple(ids)
+        params = ', '.join('?' * len(ids))
+        cursor.execute("DELETE FROM available WHERE id IN (%s)" % params, ids)
 
     @with_cursor
     def clear_available(self, cursor):
@@ -195,14 +197,17 @@ class PackageStore(HashIdStore):
 
     @with_cursor
     def add_available_upgrades(self, cursor, ids):
-        for id in ids:
-            cursor.execute("REPLACE INTO available_upgrade VALUES (?)", (id,))
+        ids = tuple(ids)
+        params = ', '.join(['(?)'] * len(ids))
+        cursor.execute(
+            "REPLACE INTO available_upgrade VALUES %s" % params, ids)
 
     @with_cursor
     def remove_available_upgrades(self, cursor, ids):
-        id_list = ",".join(str(int(id)) for id in ids)
-        cursor.execute("DELETE FROM available_upgrade WHERE id IN (%s)"
-                       % id_list)
+        ids = tuple(ids)
+        params = ', '.join('?' * len(ids))
+        cursor.execute(
+            "DELETE FROM available_upgrade WHERE id IN (%s)" % params, ids)
 
     @with_cursor
     def clear_available_upgrades(self, cursor):
@@ -215,13 +220,16 @@ class PackageStore(HashIdStore):
 
     @with_cursor
     def add_autoremovable(self, cursor, ids):
-        for id in ids:
-            cursor.execute("REPLACE INTO autoremovable VALUES (?)", (id,))
+        ids = tuple(ids)
+        params = ', '.join(['(?)'] * len(ids))
+        cursor.execute("REPLACE INTO autoremovable VALUES %s" % params, ids)
 
     @with_cursor
     def remove_autoremovable(self, cursor, ids):
-        id_list = ",".join(str(int(id)) for id in ids)
-        cursor.execute("DELETE FROM autoremovable WHERE id IN (%s)" % id_list)
+        ids = tuple(ids)
+        params = ', '.join('?' * len(ids))
+        cursor.execute(
+            "DELETE FROM autoremovable WHERE id IN (%s)" % params, ids)
 
     @with_cursor
     def clear_autoremovable(self, cursor):
@@ -234,13 +242,15 @@ class PackageStore(HashIdStore):
 
     @with_cursor
     def add_installed(self, cursor, ids):
-        for id in ids:
-            cursor.execute("REPLACE INTO installed VALUES (?)", (id,))
+        ids = tuple(ids)
+        params = ', '.join(['(?)'] * len(ids))
+        cursor.execute("REPLACE INTO installed VALUES %s" % params, ids)
 
     @with_cursor
     def remove_installed(self, cursor, ids):
-        id_list = ",".join(str(int(id)) for id in ids)
-        cursor.execute("DELETE FROM installed WHERE id IN (%s)" % id_list)
+        ids = tuple(ids)
+        params = ', '.join('?' * len(ids))
+        cursor.execute("DELETE FROM installed WHERE id IN (%s)" % params, ids)
 
     @with_cursor
     def clear_installed(self, cursor):
@@ -260,13 +270,15 @@ class PackageStore(HashIdStore):
     @with_cursor
     def add_locked(self, cursor, ids):
         """Add the given package ids to the list of locked packages."""
-        for id in ids:
-            cursor.execute("REPLACE INTO locked VALUES (?)", (id,))
+        ids = tuple(ids)
+        params = ', '.join(['(?)'] * len(ids))
+        cursor.execute("REPLACE INTO locked VALUES %s" % params, ids)
 
     @with_cursor
     def remove_locked(self, cursor, ids):
-        id_list = ",".join(str(int(id)) for id in ids)
-        cursor.execute("DELETE FROM locked WHERE id IN (%s)" % id_list)
+        ids = tuple(ids)
+        params = ', '.join('?' * len(ids))
+        cursor.execute("DELETE FROM locked WHERE id IN (%s)" % params, ids)
 
     @with_cursor
     def clear_locked(self, cursor):
@@ -276,8 +288,8 @@ class PackageStore(HashIdStore):
     @with_cursor
     def add_hash_id_request(self, cursor, hashes):
         hashes = list(hashes)
-        cursor.execute("INSERT INTO hash_id_request (hashes, timestamp)"
-                       " VALUES (?,?)",
+        cursor.execute("INSERT INTO hash_id_request (hashes, timestamp) "
+                       "VALUES (?,?)",
                        (sqlite3.Binary(bpickle.dumps(hashes)), time.time()))
         return HashIDRequest(self._db, cursor.lastrowid)
 
@@ -317,8 +329,9 @@ class PackageStore(HashIdStore):
 
     @with_cursor
     def clear_tasks(self, cursor, except_tasks=()):
-        cursor.execute("DELETE FROM task WHERE id NOT IN (%s)" %
-                       ",".join([str(task.id) for task in except_tasks]))
+        ids = tuple(task.id for task in except_tasks)
+        params = ', '.join('?' * len(ids))
+        cursor.execute("DELETE FROM task WHERE id NOT IN (%s)" % params, ids)
 
 
 class FakePackageStore(PackageStore):
@@ -348,10 +361,11 @@ class FakePackageStore(PackageStore):
 
     @with_cursor
     def get_messages_by_ids(self, cursor, message_ids):
-        params = ", ".join(["?"] * len(message_ids))
+        message_ids = tuple(message_ids)
+        params = ", ".join("?" * len(message_ids))
         result = cursor.execute(
                 "SELECT id, data FROM message WHERE id IN (%s) "
-                "ORDER BY id" % params, tuple(message_ids)).fetchall()
+                "ORDER BY id" % params, message_ids).fetchall()
         return [(row[0], bytes(row[1])) for row in result]
 
 
@@ -430,7 +444,7 @@ def ensure_hash_id_schema(db):
     cursor = db.cursor()
     try:
         cursor.execute("CREATE TABLE hash"
-                       " (id INTEGER PRIMARY KEY, hash BLOB UNIQUE)")
+                       " (id INTEGER NOT NULL PRIMARY KEY, hash BLOB UNIQUE)")
     except (sqlite3.OperationalError, sqlite3.DatabaseError):
         cursor.close()
         db.rollback()
@@ -451,21 +465,23 @@ def ensure_package_schema(db):
     cursor = db.cursor()
     try:
         cursor.execute("CREATE TABLE autoremovable"
-                       " (id INTEGER PRIMARY KEY)")
+                       " (id INTEGER NOT NULL PRIMARY KEY)")
         cursor.execute("CREATE TABLE locked"
-                       " (id INTEGER PRIMARY KEY)")
+                       " (id INTEGER NOT NULL PRIMARY KEY)")
         cursor.execute("CREATE TABLE available"
-                       " (id INTEGER PRIMARY KEY)")
+                       " (id INTEGER NOT NULL PRIMARY KEY)")
         cursor.execute("CREATE TABLE available_upgrade"
-                       " (id INTEGER PRIMARY KEY)")
+                       " (id INTEGER NOT NULL PRIMARY KEY)")
         cursor.execute("CREATE TABLE installed"
-                       " (id INTEGER PRIMARY KEY)")
+                       " (id INTEGER NOT NULL PRIMARY KEY)")
         cursor.execute("CREATE TABLE hash_id_request"
-                       " (id INTEGER PRIMARY KEY, timestamp TIMESTAMP,"
-                       " message_id INTEGER, hashes BLOB)")
+                       " (id INTEGER NOT NULL PRIMARY KEY,"
+                       " timestamp TIMESTAMP NOT NULL, message_id INTEGER,"
+                       " hashes BLOB NOT NULL)")
         cursor.execute("CREATE TABLE task"
-                       " (id INTEGER PRIMARY KEY, queue TEXT,"
-                       " timestamp TIMESTAMP, data BLOB)")
+                       " (id INTEGER NOT NULL PRIMARY KEY,"
+                       " queue TEXT NOT NULL, timestamp TIMESTAMP NOT NULL,"
+                       " data BLOB NOT NULL)")
     except sqlite3.OperationalError:
         cursor.close()
         db.rollback()
@@ -478,7 +494,8 @@ def ensure_fake_package_schema(db):
     cursor = db.cursor()
     try:
         cursor.execute("CREATE TABLE message"
-                       " (id INTEGER PRIMARY KEY, data BLOB)")
+                       " (id INTEGER NOT NULL PRIMARY KEY,"
+                       " data BLOB NOT NULL)")
     except (sqlite3.OperationalError, sqlite3.DatabaseError):
         cursor.close()
         db.rollback()
